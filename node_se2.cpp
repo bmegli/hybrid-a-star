@@ -12,22 +12,19 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License. Reserved.
+//
+// Modifications copyright (C) 2021 Bartosz Meglicki <meglickib@gmail.com>
 
-#include <math.h>
-#include <chrono>
 #include <vector>
 #include <memory>
-#include <algorithm>
 #include <queue>
-#include <limits>
+#include <cmath>
 
-#include "ompl/base/ScopedState.h"
-#include "ompl/base/spaces/DubinsStateSpace.h"
-#include "ompl/base/spaces/ReedsSheppStateSpace.h"
+#include <ompl/base/ScopedState.h>
+#include <ompl/base/spaces/DubinsStateSpace.h>
+#include <ompl/base/spaces/ReedsSheppStateSpace.h>
 
-#include "nav2_smac_planner/node_se2.hpp"
-
-using namespace std::chrono;  // NOLINT
+#include "node_se2.hpp"
 
 namespace nav2_smac_planner
 {
@@ -213,18 +210,6 @@ void NodeSE2::reset()
   pose.theta = 0.0f;
 }
 
-bool NodeSE2::isNodeValid(const bool & traverse_unknown, GridCollisionChecker collision_checker)
-{
-  if (collision_checker.inCollision(
-      this->pose.x, this->pose.y, this->pose.theta * motion_table.bin_size, traverse_unknown))
-  {
-    return false;
-  }
-
-  _cell_cost = collision_checker.getCost();
-  return true;
-}
-
 float NodeSE2::getTraversalCost(const NodePtr & child)
 {
   const float normalized_cost = child->getCost() / 252.0;
@@ -315,117 +300,6 @@ void NodeSE2::initMotionModel(
               "Invalid motion model for SE2 node. Please select between"
               " Dubin (Ackermann forward only),"
               " Reeds-Shepp (Ackermann forward and back).");
-  }
-}
-
-void NodeSE2::computeWavefrontHeuristic(
-  nav2_costmap_2d::Costmap2D * & costmap,
-  const unsigned int & start_x, const unsigned int & start_y,
-  const unsigned int & goal_x, const unsigned int & goal_y)
-{
-  unsigned int size = costmap->getSizeInCellsX() * costmap->getSizeInCellsY();
-  if (_wavefront_heuristic.size() == size) {
-    // must reset all values
-    for (unsigned int i = 0; i != _wavefront_heuristic.size(); i++) {
-      _wavefront_heuristic[i] = 0;
-    }
-  } else {
-    unsigned int wavefront_size = _wavefront_heuristic.size();
-    _wavefront_heuristic.resize(size, 0);
-    // must reset values for non-constructed indices
-    for (unsigned int i = 0; i != wavefront_size; i++) {
-      _wavefront_heuristic[i] = 0;
-    }
-  }
-
-  const unsigned int & size_x = motion_table.size_x;
-  const int size_x_int = static_cast<int>(size_x);
-  const unsigned int size_y = costmap->getSizeInCellsY();
-  const unsigned int goal_index = goal_y * size_x + goal_x;
-  const unsigned int start_index = start_y * size_x + start_x;
-  unsigned int mx, my, mx_idx, my_idx;
-
-  std::queue<unsigned int> q;
-  q.emplace(goal_index);
-
-  unsigned int idx = goal_index;
-  _wavefront_heuristic[idx] = 2;
-
-  static const std::vector<int> neighborhood = {1, -1,  // left right
-    size_x_int, -size_x_int,  // up down
-    size_x_int + 1, size_x_int - 1,  // upper diagonals
-    -size_x_int + 1, -size_x_int - 1};  // lower diagonals
-
-  while (!q.empty() || idx == start_index) {
-    // get next one
-    idx = q.front();
-    q.pop();
-
-    my_idx = idx / size_x;
-    mx_idx = idx - (my_idx * size_x);
-
-    // find neighbors
-    for (unsigned int i = 0; i != neighborhood.size(); i++) {
-      unsigned int new_idx = static_cast<unsigned int>(static_cast<int>(idx) + neighborhood[i]);
-      unsigned int last_wave_cost = _wavefront_heuristic[idx];
-
-      // if neighbor is unvisited and non-lethal, set N and add to queue
-      if (new_idx > 0 && new_idx < size_x * size_y &&
-        _wavefront_heuristic[new_idx] == 0 &&
-        static_cast<float>(costmap->getCost(idx)) < INSCRIBED)
-      {
-        my = new_idx / size_x;
-        mx = new_idx - (my * size_x);
-
-        if (mx == 0 && mx_idx >= size_x - 1 || mx >= size_x - 1 && mx_idx == 0) {
-          continue;
-        }
-        if (my == 0 && my_idx >= size_y - 1 || my >= size_y - 1 && my_idx == 0) {
-          continue;
-        }
-
-        _wavefront_heuristic[new_idx] = last_wave_cost + 1;
-        q.emplace(idx + neighborhood[i]);
-      }
-    }
-  }
-}
-
-void NodeSE2::getNeighbors(
-  const NodePtr & node,
-  std::function<bool(const unsigned int &, nav2_smac_planner::NodeSE2 * &)> & NeighborGetter,
-  GridCollisionChecker collision_checker,
-  const bool & traverse_unknown,
-  NodeVector & neighbors)
-{
-  unsigned int index = 0;
-  NodePtr neighbor = nullptr;
-  Coordinates initial_node_coords;
-  const MotionPoses motion_projections = motion_table.getProjections(node);
-
-  for (unsigned int i = 0; i != motion_projections.size(); i++) {
-    index = NodeSE2::getIndex(
-      static_cast<unsigned int>(motion_projections[i]._x),
-      static_cast<unsigned int>(motion_projections[i]._y),
-      static_cast<unsigned int>(motion_projections[i]._theta),
-      motion_table.size_x, motion_table.num_angle_quantization);
-
-    if (NeighborGetter(index, neighbor) && !neighbor->wasVisited()) {
-      // Cache the initial pose in case it was visited but valid
-      // don't want to disrupt continuous coordinate expansion
-      initial_node_coords = neighbor->pose;
-      neighbor->setPose(
-        Coordinates(
-          motion_projections[i]._x,
-          motion_projections[i]._y,
-          motion_projections[i]._theta));
-      if (neighbor->isNodeValid(traverse_unknown, collision_checker)) {
-        neighbor->setMotionPrimitiveIndex(i);
-        neighbors.push_back(neighbor);
-      } else {
-        neighbor->setPose(initial_node_coords);
-      }
-    }
   }
 }
 

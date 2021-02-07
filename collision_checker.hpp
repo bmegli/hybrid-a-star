@@ -11,9 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License. Reserved.
+//
+// Modifications copyright (C) 2021 Bartosz Meglicki <meglickib@gmail.com>
 
-#include "nav2_costmap_2d/footprint_collision_checker.hpp"
-#include "nav2_smac_planner/constants.hpp"
+#include "footprint-collision-checker/footprint_collision_checker.hpp"
+#include "constants.hpp"
 
 #ifndef NAV2_SMAC_PLANNER__COLLISION_CHECKER_HPP_
 #define NAV2_SMAC_PLANNER__COLLISION_CHECKER_HPP_
@@ -25,17 +27,19 @@ namespace nav2_smac_planner
  * @class nav2_smac_planner::GridCollisionChecker
  * @brief A costmap grid collision checker
  */
+template<typename CostmapT, typename PointT>
 class GridCollisionChecker
-  : public nav2_costmap_2d::FootprintCollisionChecker<nav2_costmap_2d::Costmap2D *>
+  : public fcc::FootprintCollisionChecker<CostmapT, PointT>
 {
 public:
+  typedef typename fcc::FootprintCollisionChecker<CostmapT, PointT>::Footprint Footprint;
+
   /**
    * @brief A constructor for nav2_smac_planner::GridCollisionChecker
    * @param costmap The costmap to collision check against
    */
-  GridCollisionChecker(
-    nav2_costmap_2d::Costmap2D * costmap)
-  : FootprintCollisionChecker(costmap)
+  GridCollisionChecker(CostmapT costmap)
+  : fcc::FootprintCollisionChecker<CostmapT, PointT>(costmap)
   {
   }
 
@@ -44,7 +48,7 @@ public:
    * @param footprint The footprint to collision check against
    * @param radius Whether or not the footprint is a circle and use radius collision checking
    */
-  void setFootprint(const nav2_costmap_2d::Footprint & footprint, const bool & radius)
+  void setFootprint(const typename fcc::FootprintCollisionChecker<CostmapT, PointT>::Footprint &footprint, const bool &radius)
   {
     unoriented_footprint_ = footprint;
     footprint_is_radius_ = radius;
@@ -66,11 +70,11 @@ public:
   {
     // Assumes setFootprint already set
     double wx, wy;
-    costmap_->mapToWorld(static_cast<double>(x), static_cast<double>(y), wx, wy);
+    this->costmap_->mapToWorld(static_cast<double>(x), static_cast<double>(y), wx, wy);
 
     if (!footprint_is_radius_) {
       // if footprint, then we check for the footprint's points
-      footprint_cost_ = footprintCostAtPose(
+      footprint_cost_ = this->footprintCostAtPose(
         wx, wy, static_cast<double>(theta), unoriented_footprint_);
       if (footprint_cost_ == UNKNOWN && traverse_unknown) {
         return false;
@@ -80,7 +84,7 @@ public:
       return footprint_cost_ >= OCCUPIED;
     } else {
       // if radius, then we can check the center of the cost assuming inflation is used
-      footprint_cost_ = costmap_->getCost(
+      footprint_cost_ = this->costmap_->getCost(
         static_cast<unsigned int>(x), static_cast<unsigned int>(y));
 
       if (footprint_cost_ == UNKNOWN && traverse_unknown) {
@@ -103,7 +107,7 @@ public:
   }
 
 protected:
-  nav2_costmap_2d::Footprint unoriented_footprint_;
+  typename fcc::FootprintCollisionChecker<CostmapT, PointT>::Footprint unoriented_footprint_;
   double footprint_cost_;
   bool footprint_is_radius_;
 };

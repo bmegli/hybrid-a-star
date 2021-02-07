@@ -17,20 +17,14 @@
 #define NAV2_SMAC_PLANNER__A_STAR_HPP_
 
 #include <vector>
-#include <iostream>
-#include <unordered_map>
-#include <memory>
 #include <queue>
-#include <utility>
-#include "Eigen/Core"
+#include <unordered_map>
 
-#include "nav2_costmap_2d/costmap_2d.hpp"
+#include <eigen3/Eigen/Core>
 
-#include "nav2_smac_planner/node_2d.hpp"
-#include "nav2_smac_planner/node_se2.hpp"
-#include "nav2_smac_planner/node_basic.hpp"
-#include "nav2_smac_planner/types.hpp"
-#include "nav2_smac_planner/constants.hpp"
+#include "node_se2.hpp"
+#include "node_basic.hpp"
+#include "types.hpp"
 
 namespace nav2_smac_planner
 {
@@ -48,18 +42,18 @@ inline double squaredDistance(
  * @class nav2_smac_planner::AStarAlgorithm
  * @brief An A* implementation for planning in a costmap. Templated based on the Node type.
  */
-template<typename NodeT>
+template<typename CostmapT, typename CollisionCheckerT>
 class AStarAlgorithm
 {
 public:
-  typedef NodeT * NodePtr;
-  typedef std::unordered_map<unsigned int, NodeT> Graph;
+  typedef NodeSE2 * NodePtr;
+  typedef std::unordered_map<unsigned int, NodeSE2> Graph;
   typedef std::vector<NodePtr> NodeVector;
-  typedef std::pair<float, NodeBasic<NodeT>> NodeElement;
-  typedef typename NodeT::Coordinates Coordinates;
-  typedef typename NodeT::CoordinateVector CoordinateVector;
+  typedef std::pair<float, NodeBasic<NodeSE2>> NodeElement;
+  typedef typename NodeSE2::Coordinates Coordinates;
+  typedef typename NodeSE2::CoordinateVector CoordinateVector;
   typedef typename NodeVector::iterator NeighborIterator;
-  typedef std::function<bool (const unsigned int &, NodeT * &)> NodeGetter;
+  typedef std::function<bool (const unsigned int &, NodeSE2 * &)> NodeGetter;
 
   /**
    * @struct nav2_smac_planner::NodeComparator
@@ -120,7 +114,7 @@ public:
     const unsigned int & x,
     const unsigned int & y,
     const unsigned int & dim_3,
-    nav2_costmap_2d::Costmap2D * & costmap);
+    CostmapT * & costmap);
 
   /**
    * @brief Set the goal for planning, as a node index
@@ -149,7 +143,7 @@ public:
    * @param footprint footprint of robot
    * @param use_radius Whether this footprint is a circle with radius
    */
-  void setFootprint(nav2_costmap_2d::Footprint footprint, bool use_radius);
+  void setFootprint(typename CollisionCheckerT::Footprint footprint, bool use_radius);
 
   /**
    * @brief Perform an analytic path expansion to the goal
@@ -310,12 +304,14 @@ protected:
   MotionModel _motion_model;
   NodeHeuristicPair _best_heuristic_node;
 
-  GridCollisionChecker _collision_checker;
-  nav2_costmap_2d::Footprint _footprint;
+  CollisionCheckerT _collision_checker;
+  typename CollisionCheckerT::Footprint _footprint;
   bool _is_radius_footprint;
-  nav2_costmap_2d::Costmap2D * _costmap;
+  CostmapT * _costmap;
 };
 
 }  // namespace nav2_smac_planner
+
+#include "a_star.tpp"
 
 #endif  // NAV2_SMAC_PLANNER__A_STAR_HPP_

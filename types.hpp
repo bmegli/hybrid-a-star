@@ -15,7 +15,6 @@
 #ifndef NAV2_SMAC_PLANNER__TYPES_HPP_
 #define NAV2_SMAC_PLANNER__TYPES_HPP_
 
-#include <vector>
 #include <utility>
 
 namespace nav2_smac_planner

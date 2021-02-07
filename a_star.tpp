@@ -13,31 +13,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License. Reserved.
 
-#include <omp.h>
-
 #include <ompl/base/ScopedState.h>
 #include <ompl/base/spaces/DubinsStateSpace.h>
 #include <ompl/base/spaces/ReedsSheppStateSpace.h>
 
-#include <cmath>
 #include <stdexcept>
-#include <memory>
-#include <algorithm>
-#include <limits>
-#include <type_traits>
-#include <chrono>
-#include <thread>
-#include <utility>
-#include <vector>
-
-#include "nav2_smac_planner/a_star.hpp"
-using namespace std::chrono;  // NOLINT
 
 namespace nav2_smac_planner
 {
 
-template<typename NodeT>
-AStarAlgorithm<NodeT>::AStarAlgorithm(
+template<typename CostmapT, typename CollisionCheckerT>
+AStarAlgorithm<CostmapT, CollisionCheckerT>::AStarAlgorithm(
   const MotionModel & motion_model,
   const SearchInfo & search_info)
 : _traverse_unknown(true),
@@ -54,13 +40,13 @@ AStarAlgorithm<NodeT>::AStarAlgorithm(
   _graph.reserve(100000);
 }
 
-template<typename NodeT>
-AStarAlgorithm<NodeT>::~AStarAlgorithm()
+template<typename CostmapT, typename CollisionCheckerT>
+AStarAlgorithm<CostmapT, CollisionCheckerT>::~AStarAlgorithm()
 {
 }
 
-template<typename NodeT>
-void AStarAlgorithm<NodeT>::initialize(
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::initialize(
   const bool & allow_unknown,
   int & max_iterations,
   const int & max_on_approach_iterations)
@@ -70,40 +56,19 @@ void AStarAlgorithm<NodeT>::initialize(
   _max_on_approach_iterations = max_on_approach_iterations;
 }
 
-template<>
-void AStarAlgorithm<Node2D>::createGraph(
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::createGraph(
   const unsigned int & x_size,
   const unsigned int & y_size,
   const unsigned int & dim_3_size,
-  nav2_costmap_2d::Costmap2D * & costmap)
-{
-  if (dim_3_size != 1) {
-    throw std::runtime_error("Node type Node2D cannot be given non-1 dim 3 quantization.");
-  }
-  _costmap = costmap;
-  _dim3_size = dim_3_size;  // 2D search MUST be 2D, not 3D or SE2.
-  clearGraph();
-
-  if (getSizeX() != x_size || getSizeY() != y_size) {
-    _x_size = x_size;
-    _y_size = y_size;
-    Node2D::initNeighborhood(_x_size, _motion_model);
-  }
-}
-
-template<>
-void AStarAlgorithm<NodeSE2>::createGraph(
-  const unsigned int & x_size,
-  const unsigned int & y_size,
-  const unsigned int & dim_3_size,
-  nav2_costmap_2d::Costmap2D * & costmap)
+  CostmapT * & costmap)
 {
   _costmap = costmap;
-  _collision_checker = GridCollisionChecker(costmap);
+  _collision_checker = CollisionCheckerT(costmap);
   _collision_checker.setFootprint(_footprint, _is_radius_footprint);
 
   _dim3_size = dim_3_size;
-  unsigned int index;
+
   clearGraph();
 
   if (getSizeX() != x_size || getSizeY() != y_size) {
@@ -113,41 +78,22 @@ void AStarAlgorithm<NodeSE2>::createGraph(
   }
 }
 
-template<typename NodeT>
-void AStarAlgorithm<NodeT>::setFootprint(nav2_costmap_2d::Footprint footprint, bool use_radius)
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::setFootprint(typename CollisionCheckerT::Footprint footprint, bool use_radius)
 {
   _footprint = footprint;
   _is_radius_footprint = use_radius;
 }
 
-template<>
-typename AStarAlgorithm<Node2D>::NodePtr AStarAlgorithm<Node2D>::addToGraph(
-  const unsigned int & index)
-{
-  return &(_graph.emplace(index, Node2D(_costmap->getCharMap()[index], index)).first->second);
-}
-
-template<>
-typename AStarAlgorithm<NodeSE2>::NodePtr AStarAlgorithm<NodeSE2>::addToGraph(
+template<typename CostmapT, typename CollisionCheckerT>
+typename AStarAlgorithm<CostmapT, CollisionCheckerT>::NodePtr AStarAlgorithm<CostmapT, CollisionCheckerT>::addToGraph(
   const unsigned int & index)
 {
   return &(_graph.emplace(index, NodeSE2(index)).first->second);
 }
 
-template<>
-void AStarAlgorithm<Node2D>::setStart(
-  const unsigned int & mx,
-  const unsigned int & my,
-  const unsigned int & dim_3)
-{
-  if (dim_3 != 0) {
-    throw std::runtime_error("Node type Node2D cannot be given non-zero starting dim 3.");
-  }
-  _start = addToGraph(Node2D::getIndex(mx, my, getSizeX()));
-}
-
-template<>
-void AStarAlgorithm<NodeSE2>::setStart(
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::setStart(
   const unsigned int & mx,
   const unsigned int & my,
   const unsigned int & dim_3)
@@ -160,22 +106,8 @@ void AStarAlgorithm<NodeSE2>::setStart(
       static_cast<float>(dim_3)));
 }
 
-template<>
-void AStarAlgorithm<Node2D>::setGoal(
-  const unsigned int & mx,
-  const unsigned int & my,
-  const unsigned int & dim_3)
-{
-  if (dim_3 != 0) {
-    throw std::runtime_error("Node type Node2D cannot be given non-zero goal dim 3.");
-  }
-
-  _goal = addToGraph(Node2D::getIndex(mx, my, getSizeX()));
-  _goal_coordinates = Node2D::Coordinates(mx, my);
-}
-
-template<>
-void AStarAlgorithm<NodeSE2>::setGoal(
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::setGoal(
   const unsigned int & mx,
   const unsigned int & my,
   const unsigned int & dim_3)
@@ -194,8 +126,8 @@ void AStarAlgorithm<NodeSE2>::setGoal(
     mx, my);
 }
 
-template<typename NodeT>
-bool AStarAlgorithm<NodeT>::areInputsValid()
+template<typename CostmapT, typename CollisionCheckerT>
+bool AStarAlgorithm<CostmapT, CollisionCheckerT>::areInputsValid()
 {
   // Check if graph was filled in
   if (_graph.empty()) {
@@ -222,12 +154,12 @@ bool AStarAlgorithm<NodeT>::areInputsValid()
   return true;
 }
 
-template<typename NodeT>
-bool AStarAlgorithm<NodeT>::createPath(
+template<typename CostmapT, typename CollisionCheckerT>
+bool AStarAlgorithm<CostmapT, CollisionCheckerT>::createPath(
   CoordinateVector & path, int & iterations,
   const float & tolerance)
 {
-  _tolerance = tolerance * NodeT::neutral_cost;
+  _tolerance = tolerance * NodeSE2::neutral_cost;
   _best_heuristic_node = {std::numeric_limits<float>::max(), 0};
   clearQueue();
 
@@ -302,7 +234,7 @@ bool AStarAlgorithm<NodeT>::createPath(
 
     // 4) Expand neighbors of Nbest not visited
     neighbors.clear();
-    NodeT::getNeighbors(
+    NodeSE2::getNeighbors(
       current_node, neighborGetter, _collision_checker, _traverse_unknown, neighbors);
 
     for (neighbor_iterator = neighbors.begin();
@@ -328,16 +260,16 @@ bool AStarAlgorithm<NodeT>::createPath(
   return false;
 }
 
-template<typename NodeT>
-bool AStarAlgorithm<NodeT>::isGoal(NodePtr & node)
+template<typename CostmapT, typename CollisionCheckerT>
+bool AStarAlgorithm<CostmapT, CollisionCheckerT>::isGoal(NodePtr & node)
 {
   return node == getGoal();
 }
 
-template<>
-AStarAlgorithm<NodeSE2>::NodePtr AStarAlgorithm<NodeSE2>::getAnalyticPath(
-  const NodePtr & node,
-  const NodeGetter & node_getter)
+template<typename CostmapT, typename CollisionCheckerT>
+typename AStarAlgorithm<CostmapT, CollisionCheckerT>::NodePtr AStarAlgorithm<CostmapT, CollisionCheckerT>::getAnalyticPath(
+  const AStarAlgorithm<CostmapT, CollisionCheckerT>::NodePtr & node,
+  const AStarAlgorithm<CostmapT, CollisionCheckerT>::NodeGetter & node_getter)
 {
   ompl::base::ScopedState<> from(node->motion_table.state_space), to(
     node->motion_table.state_space), s(node->motion_table.state_space);
@@ -428,35 +360,8 @@ AStarAlgorithm<NodeSE2>::NodePtr AStarAlgorithm<NodeSE2>::getAnalyticPath(
   return _goal;
 }
 
-template<typename NodeT>
-typename AStarAlgorithm<NodeT>::NodePtr AStarAlgorithm<NodeT>::getAnalyticPath(
-  const NodePtr & node,
-  const NodeGetter & node_getter)
-{
-  return NodePtr(nullptr);
-}
-
-template<>
-bool AStarAlgorithm<Node2D>::backtracePath(NodePtr & node, CoordinateVector & path)
-{
-  if (!node->parent) {
-    return false;
-  }
-
-  NodePtr current_node = node;
-
-  while (current_node->parent) {
-    path.push_back(
-      Node2D::getCoords(
-        current_node->getIndex(), getSizeX(), getSizeDim3()));
-    current_node = current_node->parent;
-  }
-
-  return path.size() > 1;
-}
-
-template<>
-bool AStarAlgorithm<NodeSE2>::backtracePath(NodePtr & node, CoordinateVector & path)
+template<typename CostmapT, typename CollisionCheckerT>
+bool AStarAlgorithm<CostmapT, CollisionCheckerT>::backtracePath(NodePtr & node, CoordinateVector & path)
 {
   if (!node->parent) {
     return false;
@@ -472,28 +377,20 @@ bool AStarAlgorithm<NodeSE2>::backtracePath(NodePtr & node, CoordinateVector & p
   return path.size() > 1;
 }
 
-template<typename NodeT>
-typename AStarAlgorithm<NodeT>::NodePtr & AStarAlgorithm<NodeT>::getStart()
+template<typename CostmapT, typename CollisionCheckerT>
+typename AStarAlgorithm<CostmapT, CollisionCheckerT>::NodePtr & AStarAlgorithm<CostmapT, CollisionCheckerT>::getStart()
 {
   return _start;
 }
 
-template<typename NodeT>
-typename AStarAlgorithm<NodeT>::NodePtr & AStarAlgorithm<NodeT>::getGoal()
+template<typename CostmapT, typename CollisionCheckerT>
+typename AStarAlgorithm<CostmapT, CollisionCheckerT>::NodePtr & AStarAlgorithm<CostmapT, CollisionCheckerT>::getGoal()
 {
   return _goal;
 }
 
-template<typename NodeT>
-typename AStarAlgorithm<NodeT>::NodePtr AStarAlgorithm<NodeT>::getNextNode()
-{
-  NodeBasic<NodeT> node = _queue.top().second;
-  _queue.pop();
-  return node.graph_node_ptr;
-}
-
-template<>
-typename AStarAlgorithm<NodeSE2>::NodePtr AStarAlgorithm<NodeSE2>::getNextNode()
+template<typename CostmapT, typename CollisionCheckerT>
+typename AStarAlgorithm<CostmapT, CollisionCheckerT>::NodePtr AStarAlgorithm<CostmapT, CollisionCheckerT>::getNextNode()
 {
   NodeBasic<NodeSE2> node = _queue.top().second;
   _queue.pop();
@@ -505,16 +402,8 @@ typename AStarAlgorithm<NodeSE2>::NodePtr AStarAlgorithm<NodeSE2>::getNextNode()
   return node.graph_node_ptr;
 }
 
-template<typename NodeT>
-void AStarAlgorithm<NodeT>::addNode(const float cost, NodePtr & node)
-{
-  NodeBasic<NodeT> queued_node(node->getIndex());
-  queued_node.graph_node_ptr = node;
-  _queue.emplace(cost, queued_node);
-}
-
-template<>
-void AStarAlgorithm<NodeSE2>::addNode(const float cost, NodePtr & node)
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::addNode(const float cost, NodePtr & node)
 {
   NodeBasic<NodeSE2> queued_node(node->getIndex());
   queued_node.pose = node->pose;
@@ -522,26 +411,26 @@ void AStarAlgorithm<NodeSE2>::addNode(const float cost, NodePtr & node)
   _queue.emplace(cost, queued_node);
 }
 
-template<typename NodeT>
-float AStarAlgorithm<NodeT>::getTraversalCost(
+template<typename CostmapT, typename CollisionCheckerT>
+float AStarAlgorithm<CostmapT, CollisionCheckerT>::getTraversalCost(
   NodePtr & current_node,
   NodePtr & new_node)
 {
   return current_node->getTraversalCost(new_node);
 }
 
-template<typename NodeT>
-float & AStarAlgorithm<NodeT>::getAccumulatedCost(NodePtr & node)
+template<typename CostmapT, typename CollisionCheckerT>
+float & AStarAlgorithm<CostmapT, CollisionCheckerT>::getAccumulatedCost(NodePtr & node)
 {
   return node->getAccumulatedCost();
 }
 
-template<typename NodeT>
-float AStarAlgorithm<NodeT>::getHeuristicCost(const NodePtr & node)
+template<typename CostmapT, typename CollisionCheckerT>
+float AStarAlgorithm<CostmapT, CollisionCheckerT>::getHeuristicCost(const NodePtr & node)
 {
   const Coordinates node_coords =
-    NodeT::getCoords(node->getIndex(), getSizeX(), getSizeDim3());
-  float heuristic = NodeT::getHeuristicCost(
+    NodeSE2::getCoords(node->getIndex(), getSizeX(), getSizeDim3());
+  float heuristic = NodeSE2::getHeuristicCost(
     node_coords, _goal_coordinates);
 
   if (heuristic < _best_heuristic_node.first) {
@@ -551,59 +440,59 @@ float AStarAlgorithm<NodeT>::getHeuristicCost(const NodePtr & node)
   return heuristic;
 }
 
-template<typename NodeT>
-void AStarAlgorithm<NodeT>::clearQueue()
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::clearQueue()
 {
   NodeQueue q;
   std::swap(_queue, q);
 }
 
-template<typename NodeT>
-void AStarAlgorithm<NodeT>::clearGraph()
+template<typename CostmapT, typename CollisionCheckerT>
+void AStarAlgorithm<CostmapT, CollisionCheckerT>::clearGraph()
 {
   Graph g;
   g.reserve(100000);
   std::swap(_graph, g);
 }
 
-template<typename NodeT>
-int & AStarAlgorithm<NodeT>::getMaxIterations()
+template<typename CostmapT, typename CollisionCheckerT>
+int & AStarAlgorithm<CostmapT, CollisionCheckerT>::getMaxIterations()
 {
   return _max_iterations;
 }
 
-template<typename NodeT>
-int & AStarAlgorithm<NodeT>::getOnApproachMaxIterations()
+template<typename CostmapT, typename CollisionCheckerT>
+int & AStarAlgorithm<CostmapT, CollisionCheckerT>::getOnApproachMaxIterations()
 {
   return _max_on_approach_iterations;
 }
 
-template<typename NodeT>
-float & AStarAlgorithm<NodeT>::getToleranceHeuristic()
+template<typename CostmapT, typename CollisionCheckerT>
+float & AStarAlgorithm<CostmapT, CollisionCheckerT>::getToleranceHeuristic()
 {
   return _tolerance;
 }
 
-template<typename NodeT>
-unsigned int & AStarAlgorithm<NodeT>::getSizeX()
+template<typename CostmapT, typename CollisionCheckerT>
+unsigned int & AStarAlgorithm<CostmapT, CollisionCheckerT>::getSizeX()
 {
   return _x_size;
 }
 
-template<typename NodeT>
-unsigned int & AStarAlgorithm<NodeT>::getSizeY()
+template<typename CostmapT, typename CollisionCheckerT>
+unsigned int & AStarAlgorithm<CostmapT, CollisionCheckerT>::getSizeY()
 {
   return _y_size;
 }
 
-template<typename NodeT>
-unsigned int & AStarAlgorithm<NodeT>::getSizeDim3()
+template<typename CostmapT, typename CollisionCheckerT>
+unsigned int & AStarAlgorithm<CostmapT, CollisionCheckerT>::getSizeDim3()
 {
   return _dim3_size;
 }
 
-template<typename NodeT>
-typename AStarAlgorithm<NodeT>::NodePtr AStarAlgorithm<NodeT>::tryAnalyticExpansion(
+template<typename CostmapT, typename CollisionCheckerT>
+typename AStarAlgorithm<CostmapT, CollisionCheckerT>::NodePtr AStarAlgorithm<CostmapT, CollisionCheckerT>::tryAnalyticExpansion(
   const NodePtr & current_node, const NodeGetter & getter, int & analytic_iterations,
   int & closest_distance)
 {
@@ -612,13 +501,13 @@ typename AStarAlgorithm<NodeT>::NodePtr AStarAlgorithm<NodeT>::tryAnalyticExpans
 
     // See if we are closer and should be expanding more often
     const Coordinates node_coords =
-      NodeT::getCoords(current_node->getIndex(), getSizeX(), getSizeDim3());
+      NodeSE2::getCoords(current_node->getIndex(), getSizeX(), getSizeDim3());
     closest_distance =
       std::min(
       closest_distance,
-      static_cast<int>(NodeT::getHeuristicCost(
+      static_cast<int>(NodeSE2::getHeuristicCost(
         node_coords,
-        _goal_coordinates) / NodeT::neutral_cost)
+        _goal_coordinates) / NodeSE2::neutral_cost)
       );
     // We want to expand at a rate of d/expansion_ratio,
     // but check to see if we are so close that we would be expanding every iteration
@@ -643,9 +532,5 @@ typename AStarAlgorithm<NodeT>::NodePtr AStarAlgorithm<NodeT>::tryAnalyticExpans
   // No valid motion model - return nullptr
   return NodePtr(nullptr);
 }
-
-// Instantiate algorithm for the supported template types
-template class AStarAlgorithm<Node2D>;
-template class AStarAlgorithm<NodeSE2>;
 
 }  // namespace nav2_smac_planner

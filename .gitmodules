@@ -1,0 +1,3 @@
+[submodule "footprint-collision-checker"]
+	path = footprint-collision-checker
+	url = https://github.com/bmegli/footprint-collision-checker.git

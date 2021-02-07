@@ -11,27 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License. Reserved.
+//
+// Modifications copyright (C) 2021 Bartosz Meglicki <meglickib@gmail.com>
 
 #ifndef NAV2_SMAC_PLANNER__NODE_BASIC_HPP_
 #define NAV2_SMAC_PLANNER__NODE_BASIC_HPP_
-
-#include <math.h>
-#include <vector>
-#include <cmath>
-#include <iostream>
-#include <functional>
-#include <queue>
-#include <memory>
-#include <utility>
-#include <limits>
-
-#include "ompl/base/StateSpace.h"
-
-#include "nav2_smac_planner/constants.hpp"
-#include "nav2_smac_planner/node_se2.hpp"
-#include "nav2_smac_planner/node_2d.hpp"
-#include "nav2_smac_planner/types.hpp"
-#include "nav2_smac_planner/collision_checker.hpp"
 
 namespace nav2_smac_planner
 {
@@ -50,8 +34,9 @@ public:
    * @param index The index of this node for self-reference
    */
   explicit NodeBasic(const unsigned int index)
-  : index(index),
-    graph_node_ptr(nullptr)
+  : graph_node_ptr(nullptr), 
+    index(index)
+    
   {
   }
 
@@ -59,9 +44,6 @@ public:
   NodeT * graph_node_ptr;
   unsigned int index;
 };
-
-template class NodeBasic<Node2D>;
-template class NodeBasic<NodeSE2>;
 
 }  // namespace nav2_smac_planner
 
