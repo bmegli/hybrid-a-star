@@ -41,10 +41,27 @@ public:
 	  return false;
 	}
 
+	bool displayToMap(double dx, double dy, unsigned int &mx, unsigned int &my)
+	{
+	  mx = static_cast<unsigned int>(dx * size_x / display_x);
+	  my = static_cast<unsigned int>(dy * size_y / display_y);
+
+	  if (mx < size_x && my < size_y)
+		 return true;
+
+	  return false;
+	}
+
 	void mapToWorld(unsigned int mx, unsigned int my, double & wx, double & wy) const
 	{
 		wx = origin_x + (mx + 0.5) * resolution;
 		wy = origin_y + (my + 0.5) * resolution;		
+	}
+
+	void mapToDisplay(unsigned int mx, unsigned int my, double & dx, double & dy) const
+	{
+		dx = origin_x + (mx + 0.5) * display_x/size_x;
+		dy = origin_y + (my + 0.5) * display_y/size_y;
 	}
 
 	double getCost(int x, int y)
@@ -70,7 +87,17 @@ public:
 	{
 		return size_y;
 	}
+
+	int getDisplayX()
+	{
+		return display_x;
+	}
 	
+	int getDisplayY()
+	{
+		return display_y;
+	}
+
 	bool fromImage(const std::string &filename)
 	{
 		using namespace cv;
@@ -98,11 +125,13 @@ public:
 
 private:
 	cv::Mat data;
-	double resolution = 5;
+	double resolution = 0.5;
 	double origin_x = 0.0;
 	double origin_y = 0.0;
-	double size_x = 100;
-	double size_y = 100;
+	double size_x = 200;
+	double size_y = 200;
+	double display_x = 1000;
+	double display_y = 1000;
 };
 
 struct PointMock
@@ -124,22 +153,22 @@ struct State
 	cv::Point end;
 };
 
-void OnMouse(int event, int x, int y, int flags, void* userdata)
+void OnMouse(int event, int x, int y, int /*flags*/, void* userdata)
 {
 	State *state = (State*)userdata;
 	
 	if( event == cv::EVENT_LBUTTONDOWN )
 	{
 		unsigned int mx, my;
-		state->map->worldToMap(x, y, mx, my);
+		state->map->displayToMap(x, y, mx, my);
 		state->start = cv::Point(mx, my);
-		cout << "mx" << mx << " my" << my << endl;
+		cout << "mx " << mx << " my " << my << endl;
 	}
 
 	if( event == cv::EVENT_RBUTTONDOWN )
 	{
 		unsigned int mx, my;
-		state->map->worldToMap(x, y, mx, my);
+		state->map->displayToMap(x, y, mx, my);
 		state->end = cv::Point(mx, my);
 		cout << "mx" << mx << " my" << my << endl;
 	}	
@@ -147,24 +176,20 @@ void OnMouse(int event, int x, int y, int flags, void* userdata)
 
 void Display(MapMock *map, const NodeSE2::CoordinateVector &path)
 {
-	int displayWidth = map->getSizeInCellsX() * map->getResolution(), displayHeight = map->getSizeInCellsY() * map->getResolution();
-	
 	cv::Mat img;
-	cv::resize(map->getData(), img, cv::Size(displayWidth, displayHeight));
+	cv::resize(map->getData(), img, cv::Size(map->getDisplayX(), map->getDisplayY()));
 	threshold(img, img, 127, 254, cv::THRESH_BINARY);
 	
 	img = ~img;
 	
-	for (int i = 0; i != path.size(); ++i)
+	for (size_t i = 0; i != path.size(); ++i)
 	{
-		double wx, wy;
-		map->mapToWorld(path[i].x, path[i].y, wx, wy);
-		cv::circle(img, cv::Point(wx, wy), 5, 127, 1);
+		double dx, dy;
+		map->mapToDisplay(path[i].x, path[i].y, dx, dy);
+		cv::circle(img, cv::Point(dx, dy), 10, 127, 1);
 	}
-		
-	
+
 	cv::imshow("map", img);
-	
 }
 
 void MainLoop(State *state)
@@ -176,23 +201,25 @@ void MainLoop(State *state)
 		cout << "LMB: start | RMB: goal | ANY: plan | ESC: quit" << endl;
 		
 		FootprintCollisionChecker<MapMock*, PointMock>::Footprint footprint;
-		footprint.push_back( {-5, -5} );
-		footprint.push_back( {5, -5} );
-		footprint.push_back( {5, 5});
-		footprint.push_back( {-5, 5} );
+
+		footprint.push_back( {-1, -1} );
+		footprint.push_back( {1, -1} );
+		footprint.push_back( {1, 1});
+		footprint.push_back( {-1, 1} );
 
 		SearchInfo info;
 
 		info.change_penalty = 1.2;
 		info.non_straight_penalty = 1.4;
 		info.reverse_penalty = 2.1;
-		info.minimum_turning_radius = 5;  // in grid coordinates
+		info.minimum_turning_radius = 4;  // in grid coordinates
+
 		unsigned int size_theta = 72;
 
 		AStarAlgorithm<MapMock, GridCollisionChecker<MapMock*, PointMock>> a_star(nav2_smac_planner::MotionModel::DUBIN, info);
 
-		int max_iterations = 10000;
-		int it_on_approach = 10;
+		int max_iterations = 100000;
+		int it_on_approach = 100;
 
 		a_star.initialize(false, max_iterations, it_on_approach);
 		a_star.setFootprint(footprint, false);
@@ -203,7 +230,7 @@ void MainLoop(State *state)
 
 		NodeSE2::CoordinateVector path;
 
-		float tolerance = 10.0;
+		float tolerance = 5.0;
 		int num_it = 0;
 
 		bool found = a_star.createPath(path, num_it, tolerance);
@@ -219,19 +246,22 @@ void MainLoop(State *state)
 
 int main(int argc, char **argv)
 {	
-	MapMock *map = new MapMock();	
-	if(!map->fromImage("../maps/default.png"))
+	MapMock *map = new MapMock();
+
+	if(!map->fromImage("../maps/maze.png"))
 	{
 		cerr << "failed to load map, terminating" << endl;
 		return 1;
 	}
-		
-	State state {map, cv::Point(10, 10), cv::Point(80, 80)};
-	
+
+	State state {map, cv::Point(40, 100), cv::Point(180, 100)};
+
 	cv::namedWindow("map", 1);
 	cv::setMouseCallback("map", OnMouse, &state);
 	MainLoop(&state);
-	
+
+	delete map;
+
 	cout << "done!" << endl;
 
 	return 0;

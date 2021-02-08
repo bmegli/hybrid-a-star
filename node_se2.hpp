@@ -530,12 +530,11 @@ void NodeSE2::computeWavefrontHeuristic(
         my = new_idx / size_x;
         mx = new_idx - (my * size_x);
 
-        if (mx == 0 && mx_idx >= size_x - 1 || mx >= size_x - 1 && mx_idx == 0) {
+        if ( (mx == 0 && mx_idx >= size_x - 1) || (mx >= size_x - 1 && mx_idx == 0) )
           continue;
-        }
-        if (my == 0 && my_idx >= size_y - 1 || my >= size_y - 1 && my_idx == 0) {
+
+        if ( (my == 0 && my_idx >= size_y - 1) || (my >= size_y - 1 && my_idx == 0) )
           continue;
-        }
 
         _wavefront_heuristic[new_idx] = last_wave_cost + 1;
         q.emplace(idx + neighborhood[i]);

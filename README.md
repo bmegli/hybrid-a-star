@@ -45,6 +45,11 @@ make
 ./gui-example
 ```
 
+Use:
+- left mouse button -> start position
+- right mouse button -> goal position
+- any key -> plan
+- esc -> quit
 
 ## Using
 
