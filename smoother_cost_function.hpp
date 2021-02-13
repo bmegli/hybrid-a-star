@@ -132,7 +132,7 @@ public:
       addCurvatureResidual(_params.curvature_weight, xi, xi_p1, xi_m1, curvature_params, cost_raw);
       addDistanceResidual(_params.distance_weight, xi, _original_path->at(i), cost_raw);
 
-      if (valid_coords = _costmap->worldToMap(xi[0], xi[1], mx, my)) {
+      if ( (valid_coords = _costmap->worldToMap(xi[0], xi[1], mx, my)) ) {
         costmap_cost = _costmap->getCost(mx, my);
         addCostResidual(_params.costmap_weight, costmap_cost, cost_raw);
       }
@@ -315,9 +315,9 @@ protected:
 
     const Eigen::Vector2d jacobian = u *
       (common_prefix * (-p1 - p2) - (common_suffix * d_delta_xi_d_xi));
-    const Eigen::Vector2d jacobian_im1 = u *
-      (common_prefix * p2 + (common_suffix * d_delta_xi_d_xi));
-    const Eigen::Vector2d jacobian_ip1 = u * (common_prefix * p1);
+    //const Eigen::Vector2d jacobian_im1 = u *
+    //  (common_prefix * p2 + (common_suffix * d_delta_xi_d_xi));
+    //const Eigen::Vector2d jacobian_ip1 = u * (common_prefix * p1);
 
     // Old formulation we may require again.
     // j0 += weight *
