@@ -11,23 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License. Reserved.
+//
+// Modifications copyright (C) 2021 Bartosz Meglicki <meglickib@gmail.com>
 
 #ifndef NAV2_SMAC_PLANNER__SMOOTHER_COST_FUNCTION_HPP_
 #define NAV2_SMAC_PLANNER__SMOOTHER_COST_FUNCTION_HPP_
 
-#include <cmath>
 #include <vector>
-#include <iostream>
-#include <unordered_map>
-#include <memory>
-#include <queue>
-#include <utility>
 
-#include "ceres/ceres.h"
-#include "Eigen/Core"
-#include "nav2_smac_planner/types.hpp"
-#include "nav2_costmap_2d/costmap_2d.hpp"
-#include "nav2_smac_planner/options.hpp"
+#include <ceres/ceres.h>
+#include <Eigen/Core>
+
+#include "options.hpp"
 
 #define EPSILON 0.0001
 
@@ -39,6 +34,7 @@ namespace nav2_smac_planner
  * @brief Cost function for path smoothing with multiple terms
  * including curvature, smoothness, collision, and avoid obstacles.
  */
+template <typename CostmapT>
 class UnconstrainedSmootherCostFunction : public ceres::FirstOrderFunction
 {
 public:
@@ -49,7 +45,7 @@ public:
    */
   UnconstrainedSmootherCostFunction(
     std::vector<Eigen::Vector2d> * original_path,
-    nav2_costmap_2d::Costmap2D * costmap,
+    CostmapT * costmap,
     const SmootherParams & params)
   : _original_path(original_path),
     _num_params(2 * original_path->size()),
@@ -506,7 +502,7 @@ protected:
 
   std::vector<Eigen::Vector2d> * _original_path{nullptr};
   int _num_params;
-  nav2_costmap_2d::Costmap2D * _costmap{nullptr};
+  CostmapT * _costmap{nullptr};
   SmootherParams _params;
 };
 

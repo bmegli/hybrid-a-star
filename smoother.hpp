@@ -11,19 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License. Reserved.
+//
+// Modifications copyright (C) 2021 Bartosz Meglicki <meglickib@gmail.com>
 
 #ifndef NAV2_SMAC_PLANNER__SMOOTHER_HPP_
 #define NAV2_SMAC_PLANNER__SMOOTHER_HPP_
 
-#include <cmath>
 #include <vector>
 #include <iostream>
-#include <memory>
-#include <queue>
-#include <utility>
 
-#include "nav2_smac_planner/types.hpp"
-#include "nav2_smac_planner/smoother_cost_function.hpp"
+#include "smoother_cost_function.hpp"
 
 #include "ceres/ceres.h"
 #include "Eigen/Core"
@@ -35,6 +32,7 @@ namespace nav2_smac_planner
  * @class nav2_smac_planner::Smoother
  * @brief A Conjugate Gradient 2D path smoother implementation
  */
+template<typename CostmapT>
 class Smoother
 {
 public:
@@ -100,8 +98,8 @@ public:
    */
   bool smooth(
     std::vector<Eigen::Vector2d> & path,
-    nav2_costmap_2d::Costmap2D * costmap,
-    const SmootherParams & params)
+    CostmapT *costmap,
+    const SmootherParams &params)
   {
     _options.max_solver_time_in_seconds = params.max_time;
 
@@ -112,7 +110,7 @@ public:
     }
 
     ceres::GradientProblemSolver::Summary summary;
-    ceres::GradientProblem problem(new UnconstrainedSmootherCostFunction(&path, costmap, params));
+    ceres::GradientProblem problem(new UnconstrainedSmootherCostFunction<CostmapT>(&path, costmap, params));
     ceres::Solve(_options, problem, parameters, &summary);
 
     if (_debug) {
