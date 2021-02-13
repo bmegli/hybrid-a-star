@@ -10,7 +10,7 @@ Implementation is mostly based on 2020 [nav2_smac_planner](https://github.com/ro
 
 - not recommended for third-party use yet
 - Hybrid A* already usable
-- Smoother not rewritten yet
+- Smoother already usable
 - interface and implementation subject to change
 - CMake build working but preliminary
 
@@ -18,6 +18,7 @@ Implementation is mostly based on 2020 [nav2_smac_planner](https://github.com/ro
 
 - ompl
 - eigen
+- ceres
 - opencv (only for GUI example)
 
 Tested with system libraries on Ubuntu 18.04
@@ -25,7 +26,7 @@ Tested with system libraries on Ubuntu 18.04
 ## Building Instructions
 
 ```bash
-sudo apt-get install libompl-dev libeigen3-dev libopencv-dev
+sudo apt-get install libompl-dev libeigen3-dev libceres-dev libopencv-dev
 # don't forget recursive, library uses submodules
 git clone --recursive https://github.com/bmegli/hybrid-a-star.git
 cd hybrid-a-star
@@ -51,6 +52,9 @@ Use:
 - any key -> plan
 - esc -> quit
 
+
+Optionally enable smoother in `gui_example.cpp` `main` and recompile.
+
 ## Using
 
 See examples for now.
@@ -59,8 +63,8 @@ See examples for now.
 
 A mix of various open sources licenses, mainly:
 - Apache 2.0
-- BSD
 - BSD 2.0
+- BSD
 
 See individual files.
 

@@ -58,12 +58,12 @@ public:
 		return getCost(x, y);
 	}
 
-	int getSizeInCellsX()
+	unsigned int getSizeInCellsX()
 	{
 		return size_x;
 	}
 	
-	int getSizeInCellsY()
+	unsigned int getSizeInCellsY()
 	{
 		return size_y;
 	}
@@ -88,7 +88,7 @@ using namespace nav2_smac_planner;
 
 using namespace std;
 
-int main(int argc, char **argv)
+int main(int /*argc*/, char **/*argv*/)
 {
 	MapMock *map = new MapMock();
 	
@@ -122,12 +122,12 @@ int main(int argc, char **argv)
 	a_star.createGraph(map->getSizeInCellsX(), map->getSizeInCellsY(), size_theta, map);
 	a_star.setStart(10u, 10u, 0u);
 	a_star.setGoal(80u, 80u, 40u);
-	nav2_smac_planner::NodeSE2::CoordinateVector path;
-	bool found = a_star.createPath(path, num_it, tolerance);
+	nav2_smac_planner::NodeSE2::CoordinateVector plan;
+	bool found = a_star.createPath(plan, num_it, tolerance);
 
 	cout << "found path: " << found << endl;
 	cout << "num_it " << num_it << endl;
-	cout << "path size " << path.size() << endl;
+	cout << "path size " << plan.size() << endl;
 
 	cout << "done!" << endl;
 

@@ -23,6 +23,7 @@
 
 #include "../collision_checker.hpp"
 #include "../a_star.hpp"
+#include "../smoother.hpp"
 
 class MapMock
 {
@@ -31,20 +32,9 @@ public:
 	{
 	  if (wx < origin_x || wy < origin_y)
 		 return false;
-		 
-	  mx = static_cast<unsigned int>((wx - origin_x) / resolution);
-	  my = static_cast<unsigned int>((wy - origin_y) / resolution);
-
-	  if (mx < size_x && my < size_y)
-		 return true;
-
-	  return false;
-	}
-
-	bool displayToMap(double dx, double dy, unsigned int &mx, unsigned int &my)
-	{
-	  mx = static_cast<unsigned int>(dx * size_x / display_x);
-	  my = static_cast<unsigned int>(dy * size_y / display_y);
+ 
+	  mx = static_cast<unsigned int>((wx - origin_x) / (world_x / size_x));
+	  my = static_cast<unsigned int>((wy - origin_y) / (world_y / size_y));
 
 	  if (mx < size_x && my < size_y)
 		 return true;
@@ -54,14 +44,8 @@ public:
 
 	void mapToWorld(unsigned int mx, unsigned int my, double & wx, double & wy) const
 	{
-		wx = origin_x + (mx + 0.5) * resolution;
-		wy = origin_y + (my + 0.5) * resolution;		
-	}
-
-	void mapToDisplay(unsigned int mx, unsigned int my, double & dx, double & dy) const
-	{
-		dx = origin_x + (mx + 0.5) * display_x/size_x;
-		dy = origin_y + (my + 0.5) * display_y/size_y;
+		wx = origin_x + (mx + 0.5) * (world_x / size_x);
+		wy = origin_y + (my + 0.5) * (world_y / size_y);
 	}
 
 	double getCost(int x, int y)
@@ -73,65 +57,61 @@ public:
 	{
 		int x = idx % getSizeInCellsX();
 		int y = idx / getSizeInCellsY();
-		
+
 		return getCost(x, y);
 	}
 
-	
-	int getSizeInCellsX()
+	unsigned int getSizeInCellsX()
 	{
 		return size_x;
 	}
-	
-	int getSizeInCellsY()
+
+	unsigned int getSizeInCellsY()
 	{
 		return size_y;
 	}
 
-	int getDisplayX()
+	unsigned int getWorldX()
 	{
-		return display_x;
+		return world_x;
 	}
-	
-	int getDisplayY()
+
+	unsigned int getWorldY()
 	{
-		return display_y;
+		return world_y;
 	}
 
 	bool fromImage(const std::string &filename)
 	{
 		using namespace cv;
-		
+
 		data = imread(filename, IMREAD_GRAYSCALE);
 
 		if(data.empty())
 			return false;
-			
+
+		world_x = data.cols;
+		world_y = data.rows;
+
 		resize(data, data, Size(size_x, size_y));
 		threshold(data, data, 127, 254, THRESH_BINARY_INV);
 
 		return true;
 	}
-	
+
 	const cv::Mat &getData()
 	{
 		return data;
 	}
-		
-	double getResolution() const
-	{
-		return resolution;
-	}
 
 private:
 	cv::Mat data;
-	double resolution = 0.5;
 	double origin_x = 0.0;
 	double origin_y = 0.0;
 	double size_x = 200;
 	double size_y = 200;
-	double display_x = 1000;
-	double display_y = 1000;
+	double world_x;
+	double world_y;
 };
 
 struct PointMock
@@ -149,6 +129,7 @@ using namespace std;
 struct State
 {
 	MapMock *map;
+	Smoother<MapMock> *smoother;
 	cv::Point start;
 	cv::Point end;
 };
@@ -156,63 +137,85 @@ struct State
 void OnMouse(int event, int x, int y, int /*flags*/, void* userdata)
 {
 	State *state = (State*)userdata;
-	
+
 	if( event == cv::EVENT_LBUTTONDOWN )
 	{
 		unsigned int mx, my;
-		state->map->displayToMap(x, y, mx, my);
+		state->map->worldToMap(x, y, mx, my);
 		state->start = cv::Point(mx, my);
-		cout << "mx " << mx << " my " << my << endl;
+		cout << "mx " << mx << " my " << my << " wx " << x << " wy " << y <<  endl;
 	}
 
 	if( event == cv::EVENT_RBUTTONDOWN )
 	{
 		unsigned int mx, my;
-		state->map->displayToMap(x, y, mx, my);
+		state->map->worldToMap(x, y, mx, my);
 		state->end = cv::Point(mx, my);
-		cout << "mx" << mx << " my" << my << endl;
-	}	
+		cout << "mx" << mx << " my" << my << " wx " << x << " wy " << y << endl;
+	}
 }
 
-void Display(MapMock *map, const NodeSE2::CoordinateVector &path)
+void Display(MapMock *map,
+             const std::vector<Eigen::Vector2d> &pathWorld,
+             const std::vector<Eigen::Vector2d> &pathSmooth)
 {
 	cv::Mat img;
-	cv::resize(map->getData(), img, cv::Size(map->getDisplayX(), map->getDisplayY()));
+	cv::resize(map->getData(), img, cv::Size(map->getWorldX(), map->getWorldY()));
 	threshold(img, img, 127, 254, cv::THRESH_BINARY);
-	
+
 	img = ~img;
-	
-	for (size_t i = 0; i != path.size(); ++i)
-	{
-		double dx, dy;
-		map->mapToDisplay(path[i].x, path[i].y, dx, dy);
-		cv::circle(img, cv::Point(dx, dy), 10, 127, 1);
-	}
+
+	for (size_t i = 0; i != pathWorld.size(); ++i)
+		cv::circle(img, cv::Point(pathWorld[i].x(), pathWorld[i].y()), 5, 127, 1);
+
+	for (size_t i = 0; i != pathSmooth.size(); ++i)
+		cv::circle(img, cv::Point(pathSmooth[i].x(), pathSmooth[i].y()), 5, 0, 1);
+
 
 	cv::imshow("map", img);
+}
+
+void Smooth(State *state, const SearchInfo &info, std::vector<Eigen::Vector2d> &path)
+{
+	//may require extra tuning
+	SmootherParams smoother_params;
+	smoother_params.max_curvature = 1.0f / info.minimum_turning_radius;
+	smoother_params.curvature_weight = 30.0;
+	smoother_params.distance_weight = 0.0;
+	smoother_params.smooth_weight = 100.0;
+	smoother_params.costmap_weight = 0.025;
+	smoother_params.max_time = 0.1; //limit optimization time
+
+	// Smooth plan
+	if (!state->smoother->smooth(path, state->map, smoother_params))
+	{
+		cerr << "failed to smooth plan, Ceres could not find a usable solution to optimize." << endl;
+	}
 }
 
 void MainLoop(State *state)
 {
 	MapMock *map = state->map;
-	
+	Smoother<MapMock> *smoother = state->smoother;
+
 	do
 	{
 		cout << "LMB: start | RMB: goal | ANY: plan | ESC: quit" << endl;
-		
+
 		FootprintCollisionChecker<MapMock*, PointMock>::Footprint footprint;
 
-		footprint.push_back( {-1, -1} );
-		footprint.push_back( {1, -1} );
-		footprint.push_back( {1, 1});
-		footprint.push_back( {-1, 1} );
+		//in world units
+		footprint.push_back( {-5, -5} );
+		footprint.push_back( {5, -5} );
+		footprint.push_back( {5, 5});
+		footprint.push_back( {-5, 5} );
 
 		SearchInfo info;
 
 		info.change_penalty = 1.2;
 		info.non_straight_penalty = 1.4;
 		info.reverse_penalty = 2.1;
-		info.minimum_turning_radius = 4;  // in grid coordinates
+		info.minimum_turning_radius = 5;  //in world units
 
 		unsigned int size_theta = 72;
 
@@ -232,21 +235,52 @@ void MainLoop(State *state)
 
 		float tolerance = 5.0;
 		int num_it = 0;
+		bool found;
 
-		bool found = a_star.createPath(path, num_it, tolerance);
+		try
+		{
+			found = a_star.createPath(path, num_it, tolerance);
+		}
+		catch (const std::runtime_error & e)
+		{
+			cerr << "failed to plan: " << e.what() << endl;
+			continue;
+		}
 
 		cout << "found " << found << endl;
-		cout << "num_it " << num_it << endl;
+		cout << "num_it " << num_it << " of max " << max_iterations << endl;
 		cout << "path size " << path.size() << endl;
-		
-		Display(map, path);
-		
+
+		if(!found)
+			continue;
+
+		// Convert to world coordinates
+		std::vector<Eigen::Vector2d> path_world, path_smoothed;
+		path_world.reserve(path.size());
+		path_smoothed.reserve(path.size());
+
+		for (int i = path.size() - 1; i >= 0; --i)
+		{
+			double wx, wy;
+			map->mapToWorld(path[i].x, path[i].y, wx, wy);
+			path_world.push_back(Eigen::Vector2d(wx, wy));
+			path_smoothed.push_back(Eigen::Vector2d(wx, wy));
+		}
+
+		if(smoother)
+			Smooth(state, info, path_smoothed);
+
+		Display(map, path_world, path_smoothed);
+
 	}while(cv::waitKey(0) != 27);
 }
 
 int main(int argc, char **argv)
-{	
+{
+	bool enableSmoother = false; //change to true to enable smoother
+
 	MapMock *map = new MapMock();
+	Smoother<MapMock> *smoother = nullptr;
 
 	if(!map->fromImage("../maps/maze.png"))
 	{
@@ -254,13 +288,22 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	State state {map, cv::Point(40, 100), cv::Point(180, 100)};
+	if(enableSmoother)
+	{
+		smoother = new Smoother<MapMock>();
+		OptimizerParams params; //may require extra tuning!
+		params.debug = false; //enable extra output to console
+		smoother->initialize(params);
+	}
+
+	State state {map, smoother, cv::Point(40, 100), cv::Point(180, 100)};
 
 	cv::namedWindow("map", 1);
 	cv::setMouseCallback("map", OnMouse, &state);
 	MainLoop(&state);
 
 	delete map;
+	delete smoother;
 
 	cout << "done!" << endl;
 

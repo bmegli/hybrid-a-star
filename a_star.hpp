@@ -22,7 +22,7 @@
 #include <queue>
 #include <unordered_map>
 
-#include <eigen3/Eigen/Core>
+#include <Eigen/Core>
 
 #include "node_se2.hpp"
 #include "node_basic.hpp"

@@ -11,6 +11,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 find_package( OpenCV REQUIRED )
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 project(
@@ -18,10 +20,9 @@ project(
 )
 
 # those are our main targets
-
 add_executable(simple-example node_se2.cpp examples/simple_example.cpp)
-target_link_libraries(simple-example ompl ${OpenCV_LIBS})
+target_link_libraries(simple-example ompl ${OpenCV_LIBS} Eigen3::Eigen)
 
 add_executable(gui-example node_se2.cpp examples/gui_example.cpp)
-target_link_libraries(gui-example ompl ${OpenCV_LIBS})
+target_link_libraries(gui-example ompl ceres ${OpenCV_LIBS} Eigen3::Eigen)
 
