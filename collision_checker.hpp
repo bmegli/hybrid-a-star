@@ -76,23 +76,23 @@ public:
       // if footprint, then we check for the footprint's points
       footprint_cost_ = this->footprintCostAtPose(
         wx, wy, static_cast<double>(theta), unoriented_footprint_);
-      if (footprint_cost_ == UNKNOWN && traverse_unknown) {
+      if (traverse_unknown && footprint_cost_ == CostmapT::UNKNOWN) {
         return false;
       }
 
       // if occupied or unknown and not to traverse unknown space
-      return footprint_cost_ >= OCCUPIED;
+      return footprint_cost_ >= CostmapT::OCCUPIED;
     } else {
       // if radius, then we can check the center of the cost assuming inflation is used
       footprint_cost_ = this->costmap_->getCost(
         static_cast<unsigned int>(x), static_cast<unsigned int>(y));
 
-      if (footprint_cost_ == UNKNOWN && traverse_unknown) {
+      if (traverse_unknown && footprint_cost_ == CostmapT::UNKNOWN) {
         return false;
       }
 
       // if occupied or unknown and not to traverse unknown space
-      return footprint_cost_ >= INSCRIBED;
+      return footprint_cost_ >= CostmapT::INSCRIBED;
     }
   }
 

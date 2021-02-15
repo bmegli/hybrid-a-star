@@ -104,6 +104,11 @@ public:
 		return data;
 	}
 
+	static constexpr double UNKNOWN = 255;
+	static constexpr double OCCUPIED = 254;
+	static constexpr double INSCRIBED = 253;
+	static constexpr double FREE = 0;
+
 private:
 	cv::Mat data;
 	double origin_x = 0.0;

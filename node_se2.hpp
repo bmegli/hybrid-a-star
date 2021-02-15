@@ -525,7 +525,7 @@ void NodeSE2::computeWavefrontHeuristic(
       // if neighbor is unvisited and non-lethal, set N and add to queue
       if (new_idx > 0 && new_idx < size_x * size_y &&
         _wavefront_heuristic[new_idx] == 0 &&
-        static_cast<float>(costmap->getCost(idx)) < INSCRIBED)
+        static_cast<float>(costmap->getCost(idx)) < CostmapT::INSCRIBED)
       {
         my = new_idx / size_x;
         mx = new_idx - (my * size_x);

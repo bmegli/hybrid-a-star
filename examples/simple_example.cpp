@@ -68,6 +68,11 @@ public:
 		return size_y;
 	}
 
+	static constexpr double UNKNOWN = 255;
+	static constexpr double OCCUPIED = 254;
+	static constexpr double INSCRIBED = 253;
+	static constexpr double FREE = 0;
+
 private:
 	double resolution = 0.1;
 	double origin_x = 0.0;

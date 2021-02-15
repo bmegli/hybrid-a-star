@@ -377,7 +377,7 @@ protected:
     const double & value,
     double & r) const
   {
-    if (value == FREE) {
+    if (value == CostmapT::FREE) {
       return;
     }
 
@@ -402,7 +402,7 @@ protected:
     double & j0,
     double & j1) const
   {
-    if (value == FREE) {
+    if (value == CostmapT::FREE) {
       return;
     }
 
