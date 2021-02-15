@@ -93,7 +93,7 @@ int main(int /*argc*/, char **/*argv*/)
 	MapMock *map = new MapMock();
 	
 	//initialize some footprint, just a vector<PointMock> here
-	FootprintCollisionChecker<MapMock*, PointMock>::Footprint footprint;
+	FootprintCollisionChecker<MapMock, PointMock>::Footprint footprint;
 	
 	footprint.push_back( {-1, -1} );
 	footprint.push_back( {1, -1} );
@@ -108,7 +108,7 @@ int main(int /*argc*/, char **/*argv*/)
 	info.minimum_turning_radius = 2.0;  // in grid coordinates
 	unsigned int size_theta = 72;
 
-	AStarAlgorithm<MapMock, GridCollisionChecker<MapMock*, PointMock>> a_star(nav2_smac_planner::MotionModel::DUBIN, info);
+	AStarAlgorithm<MapMock, GridCollisionChecker<MapMock, PointMock>> a_star(nav2_smac_planner::MotionModel::DUBIN, info);
 
 	int max_iterations = 10000;
 	float tolerance = 10.0;

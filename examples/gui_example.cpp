@@ -202,7 +202,7 @@ void MainLoop(State *state)
 	{
 		cout << "LMB: start | RMB: goal | ANY: plan | ESC: quit" << endl;
 
-		FootprintCollisionChecker<MapMock*, PointMock>::Footprint footprint;
+		FootprintCollisionChecker<MapMock, PointMock>::Footprint footprint;
 
 		//in world units
 		footprint.push_back( {-5, -5} );
@@ -219,7 +219,7 @@ void MainLoop(State *state)
 
 		unsigned int size_theta = 72;
 
-		AStarAlgorithm<MapMock, GridCollisionChecker<MapMock*, PointMock>> a_star(nav2_smac_planner::MotionModel::DUBIN, info);
+		AStarAlgorithm<MapMock, GridCollisionChecker<MapMock, PointMock>> a_star(nav2_smac_planner::MotionModel::DUBIN, info);
 
 		int max_iterations = 100000;
 		int it_on_approach = 100;

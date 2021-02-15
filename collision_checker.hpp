@@ -38,7 +38,7 @@ public:
    * @brief A constructor for nav2_smac_planner::GridCollisionChecker
    * @param costmap The costmap to collision check against
    */
-  GridCollisionChecker(CostmapT costmap)
+  GridCollisionChecker(CostmapT *costmap)
   : fcc::FootprintCollisionChecker<CostmapT, PointT>(costmap)
   {
   }
