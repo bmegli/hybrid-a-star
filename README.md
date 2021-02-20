@@ -21,7 +21,7 @@ Implementation is mostly based on 2020 [nav2_smac_planner](https://github.com/ro
 - ceres
 - opencv (only for GUI example)
 
-Tested with system libraries on Ubuntu 18.04
+Tested with system libraries on Ubuntu 18.04 and 20.04
 
 ## Building Instructions
 
@@ -35,6 +35,8 @@ cd build
 cmake ..
 make
 ```
+
+For Ubuntu 20.04 or custom OpenCV build set OpenCV path in CMakeLists.txt before `cmake ..`
 
 ## Running Examples
 

@@ -10,6 +10,9 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
+# For Ubuntu 20.04 or custom OpenCV build set appropriate path
+# set (OpenCV_DIR /usr/lib/x86_64-linux-gnu/cmake/opencv4/)
+
 find_package( OpenCV REQUIRED )
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 
