@@ -8,11 +8,18 @@ Implementation is mostly based on 2020 [nav2_smac_planner](https://github.com/ro
 
 ## State
 
-- not recommended for third-party use yet
+Functional:
 - Hybrid A* already usable
 - Smoother already usable
+
+Note:
 - interface and implementation subject to change
 - CMake build working but preliminary
+
+As far as I remember implementation (from original) throws exception if there is no possible path.
+This exception is not caught in examples.
+
+The code was refactored out of ROS2 in 2021 and original was probably updated since.
 
 ## Dependencies
 
